@@ -37,5 +37,12 @@
   },
   "postCreateCommand": "pip install -e . 2>/dev/null || pip install -r requirements.txt 2>/dev/null || true",
   "remoteUser": "vscode",
-  "postStartCommand": "chmod 700 /home/vscode/.ssh && chmod 600 /home/vscode/.ssh/* 2>/dev/null || true"
+  "postStartCommand": "chmod 700 /home/vscode/.ssh && chmod 600 /home/vscode/.ssh/* 2>/dev/null || true",
+  "features": {},
+  "containerEnv": {
+    "SHELL": "/bin/bash"
+  },
+  "remoteEnv": {
+    "SHELL": "/bin/bash"
+  }
 }
