@@ -270,7 +270,7 @@
                     <h2>🔌 WebSocket Connection</h2>
                     <div class="form-group">
                         <label>WebSocket URL:</label>
-                        <input type="text" id="wsUrl" value="">
+                        <input type="text" id="wsUrl" value="ws://localhost:30082">
                     </div>
                     <button onclick="connectWebSocket()">Connect WebSocket</button>
                     <button onclick="disconnectWebSocket()" style="margin-top: 10px; background: #f56565;">Disconnect</button>
@@ -284,6 +284,31 @@
                         <div class="log-entry">System initialized. Waiting for connection...</div>
                     </div>
                 </div>
+                
+                <!-- Real-time User States Panel -->
+                <div class="panel" style="margin-top: 20px;">
+                    <h2>📍 Real-time User Positions (Top 5)</h2>
+                    <div style="overflow-x: auto;">
+                        <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+                            <thead>
+                                <tr style="background: #667eea; color: white;">
+                                    <th style="padding: 8px; border: 1px solid #ddd;">User</th>
+                                    <th style="padding: 8px; border: 1px solid #ddd;">Position (x, y)</th>
+                                    <th style="padding: 8px; border: 1px solid #ddd;">Velocity</th>
+                                    <th style="padding: 8px; border: 1px solid #ddd;">SNR (dB)</th>
+                                    <th style="padding: 8px; border: 1px solid #ddd;">Best BS</th>
+                                </tr>
+                            </thead>
+                            <tbody id="userStatesTable">
+                                <tr>
+                                    <td colspan="5" style="padding: 20px; text-align: center; color: #999;">
+                                        No data yet. Start a simulation to see real-time updates.
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -291,21 +316,7 @@
     <script>
         let socket = null;
         let updateCounter = 0;
-        
-        // 현재 호스트 기반으로 API와 WebSocket URL 자동 설정
-        const currentHost = window.location.hostname;
-        const currentPort = window.location.port; // 빈 문자열일 수 있음
-        const protocol = window.location.protocol === 'https:' ? 'https:' : 'http:';
-        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        
-        // API Gateway는 NodePort 30080을 사용
-        // 항상 포트 번호를 명시하여 확실하게 연결
-        const apiHost = `${currentHost}:30080`;
-        const API_BASE = `${protocol}//${apiHost}/api`;
-        
-        // WebSocket은 NodePort 30082를 사용 (같은 호스트)
-        const wsHost = currentPort === '30082' ? currentHost : `${currentHost}:30082`;
-        const defaultWsUrl = `${wsProtocol}//${wsHost}`;
+        const API_BASE = 'http://localhost:30080/api';
         
         function log(message, type = 'info') {
             const logDiv = document.getElementById('eventLog');
@@ -358,15 +369,50 @@
                 updateCounter++;
                 document.getElementById('updateCount').textContent = updateCounter;
                 
-                log(`Update received for ${data.simulation_id}: ${data.update_type}`, 'update');
+                const updateType = data.update_type;
+                log(`Update: ${updateType} (Step ${data.delta?.data?.time_step || 0})`, 'update');
                 
+                // 실시간 데이터 표시
                 if (data.delta && data.delta.data) {
-                    if (data.delta.data.channel_matrix_summary) {
-                        const avgSnr = data.delta.data.channel_matrix_summary.avg_snr;
+                    const deltaData = data.delta.data;
+                    
+                    // SNR 통계
+                    if (deltaData.statistics) {
+                        const avgSnr = deltaData.statistics.avg_snr_db;
                         document.getElementById('avgSNR').textContent = avgSnr.toFixed(2);
+                    }
+                    
+                    // 사용자 상태 테이블 업데이트
+                    if (deltaData.user_states && deltaData.user_states.length > 0) {
+                        updateUserStatesTable(deltaData.user_states.slice(0, 5));
+                    }
+                    
+                    // 시간 스텝 정보
+                    if (deltaData.time_step !== undefined) {
+                        log(`  Step ${deltaData.time_step}: ${deltaData.num_users} users, Avg SNR=${deltaData.statistics?.avg_snr_db?.toFixed(2)}dB`);
                     }
                 }
             });
+            
+        function updateUserStatesTable(userStates) {
+            const tbody = document.getElementById('userStatesTable');
+            tbody.innerHTML = '';
+            
+            userStates.forEach(user => {
+                const row = document.createElement('tr');
+                row.style.background = 'white';
+                row.innerHTML = `
+                    <td style="padding: 8px; border: 1px solid #ddd;">${user.user_id}</td>
+                    <td style="padding: 8px; border: 1px solid #ddd;">(${user.position.x}, ${user.position.y})</td>
+                    <td style="padding: 8px; border: 1px solid #ddd;">(${user.velocity.x}, ${user.velocity.y}) m/s</td>
+                    <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; color: ${user.snr_db > 20 ? '#48bb78' : user.snr_db > 10 ? '#f6ad55' : '#f56565'};">
+                        ${user.snr_db}
+                    </td>
+                    <td style="padding: 8px; border: 1px solid #ddd;">${user.best_bs}</td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
             
             socket.on('error', (error) => {
                 log(`Error: ${error}`, 'error');
@@ -467,14 +513,9 @@
             }
         }
         
-        // 페이지 로드 시 기본 WebSocket URL 설정
+        // Auto-connect on page load
         window.addEventListener('load', () => {
-            const wsUrlInput = document.getElementById('wsUrl');
-            if (!wsUrlInput.value) {
-                wsUrlInput.value = defaultWsUrl;
-            }
-            log(`API Base: ${API_BASE}`);
-            log(`Default WebSocket URL: ${defaultWsUrl}`);
+            setTimeout(connectWebSocket, 1000);
         });
     </script>
 </body>
