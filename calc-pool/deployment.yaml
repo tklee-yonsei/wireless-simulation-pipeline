@@ -1,0 +1,114 @@
+---
+# System Core Worker Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: system-core
+  namespace: calc-pool
+  labels:
+    project: wireless-simulation-pipeline
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: system-core
+  template:
+    metadata:
+      labels:
+        app: system-core
+        worker-type: system-core
+        project: wireless-simulation-pipeline
+    spec:
+      containers:
+      - name: system-core
+        image: calc-pool:latest
+        imagePullPolicy: Never
+        command: ["python", "-u", "system-core.py"]
+        env:
+        - name: REDIS_HOST
+          value: "redis-service.queue-system.svc.cluster.local"
+        - name: REDIS_PORT
+          value: "6379"
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "500m"
+---
+# Channel Generator Worker Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: channel-generator
+  namespace: calc-pool
+  labels:
+    project: wireless-simulation-pipeline
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: channel-generator
+  template:
+    metadata:
+      labels:
+        app: channel-generator
+        worker-type: channel-generator
+        project: wireless-simulation-pipeline
+    spec:
+      containers:
+      - name: channel-generator
+        image: calc-pool:latest
+        imagePullPolicy: Never
+        command: ["python", "-u", "channel-generator.py"]
+        env:
+        - name: REDIS_HOST
+          value: "redis-service.queue-system.svc.cluster.local"
+        - name: REDIS_PORT
+          value: "6379"
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "500m"
+---
+# PDP Interpolator Worker Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pdp-interpolator
+  namespace: calc-pool
+  labels:
+    project: wireless-simulation-pipeline
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: pdp-interpolator
+  template:
+    metadata:
+      labels:
+        app: pdp-interpolator
+        worker-type: pdp-interpolator
+        project: wireless-simulation-pipeline
+    spec:
+      containers:
+      - name: pdp-interpolator
+        image: calc-pool:latest
+        imagePullPolicy: Never
+        command: ["python", "-u", "pdp-interpolator.py"]
+        env:
+        - name: REDIS_HOST
+          value: "redis-service.queue-system.svc.cluster.local"
+        - name: REDIS_PORT
+          value: "6379"
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "500m"

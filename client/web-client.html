@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wireless Simulation Monitor</title>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+        
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            padding: 30px;
+        }
+        
+        .panel {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+        
+        .panel h2 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 1.5em;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #555;
+            font-weight: 500;
+        }
+        
+        input, select {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #e0e0e0;
+            border-radius: 5px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+        
+        input:focus, select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: transform 0.2s;
+            width: 100%;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        .status {
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 10px;
+            font-weight: 500;
+        }
+        
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        
+        .log {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 15px;
+            border-radius: 5px;
+            height: 300px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+        }
+        
+        .log-entry {
+            margin-bottom: 8px;
+            padding: 5px;
+            border-left: 3px solid #667eea;
+            padding-left: 10px;
+        }
+        
+        .log-entry.update {
+            border-left-color: #48bb78;
+        }
+        
+        .log-entry.error {
+            border-left-color: #f56565;
+        }
+        
+        .metric {
+            background: white;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        .metric-label {
+            color: #666;
+            font-size: 0.9em;
+            margin-bottom: 5px;
+        }
+        
+        .metric-value {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .connection-status {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 10px 20px;
+            border-radius: 25px;
+            font-weight: 500;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        }
+        
+        .connection-status.connected {
+            background: #48bb78;
+            color: white;
+        }
+        
+        .connection-status.disconnected {
+            background: #f56565;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="connection-status" id="connectionStatus">Disconnected</div>
+    
+    <div class="container">
+        <div class="header">
+            <h1>🛰️ Wireless Simulation Monitor</h1>
+            <p>Real-time Monitoring System for E-MIMO Simulations</p>
+        </div>
+        
+        <div class="main-content">
+            <!-- Left Column -->
+            <div>
+                <!-- Create Scenario Panel -->
+                <div class="panel">
+                    <h2>📋 Create Scenario</h2>
+                    <div class="form-group">
+                        <label>Scenario Name:</label>
+                        <input type="text" id="scenarioName" value="Test Scenario">
+                    </div>
+                    <div class="form-group">
+                        <label>Number of Users:</label>
+                        <input type="number" id="numUsers" value="10" min="1" max="100">
+                    </div>
+                    <div class="form-group">
+                        <label>Simulation Duration (seconds):</label>
+                        <input type="number" id="duration" value="60" min="10" max="300">
+                    </div>
+                    <button onclick="createScenario()">Create Scenario</button>
+                    <div id="scenarioStatus"></div>
+                </div>
+                
+                <!-- Start Simulation Panel -->
+                <div class="panel" style="margin-top: 20px;">
+                    <h2>▶️ Start Simulation</h2>
+                    <div class="form-group">
+                        <label>Scenario ID:</label>
+                        <input type="text" id="scenarioId" placeholder="scenario_xxxxx">
+                    </div>
+                    <button onclick="startSimulation()">Start Simulation</button>
+                    <div id="simulationStatus"></div>
+                </div>
+                
+                <!-- Metrics Panel -->
+                <div class="panel" style="margin-top: 20px;">
+                    <h2>📊 Live Metrics</h2>
+                    <div class="metric">
+                        <div class="metric-label">Active Simulations</div>
+                        <div class="metric-value" id="activeSimulations">0</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-label">Updates Received</div>
+                        <div class="metric-value" id="updateCount">0</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-label">Average SNR (dB)</div>
+                        <div class="metric-value" id="avgSNR">-</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Right Column -->
+            <div>
+                <!-- WebSocket Control Panel -->
+                <div class="panel">
+                    <h2>🔌 WebSocket Connection</h2>
+                    <div class="form-group">
+                        <label>WebSocket URL:</label>
+                        <input type="text" id="wsUrl" value="">
+                    </div>
+                    <button onclick="connectWebSocket()">Connect WebSocket</button>
+                    <button onclick="disconnectWebSocket()" style="margin-top: 10px; background: #f56565;">Disconnect</button>
+                    <div id="wsStatus"></div>
+                </div>
+                
+                <!-- Event Log Panel -->
+                <div class="panel" style="margin-top: 20px;">
+                    <h2>📝 Event Log</h2>
+                    <div class="log" id="eventLog">
+                        <div class="log-entry">System initialized. Waiting for connection...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let socket = null;
+        let updateCounter = 0;
+        
+        // 현재 호스트 기반으로 API와 WebSocket URL 자동 설정
+        const currentHost = window.location.hostname;
+        const currentPort = window.location.port; // 빈 문자열일 수 있음
+        const protocol = window.location.protocol === 'https:' ? 'https:' : 'http:';
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        
+        // API Gateway는 NodePort 30080을 사용
+        // 항상 포트 번호를 명시하여 확실하게 연결
+        const apiHost = `${currentHost}:30080`;
+        const API_BASE = `${protocol}//${apiHost}/api`;
+        
+        // WebSocket은 NodePort 30082를 사용 (같은 호스트)
+        const wsHost = currentPort === '30082' ? currentHost : `${currentHost}:30082`;
+        const defaultWsUrl = `${wsProtocol}//${wsHost}`;
+        
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('eventLog');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            const timestamp = new Date().toLocaleTimeString();
+            entry.textContent = `[${timestamp}] ${message}`;
+            logDiv.appendChild(entry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+        
+        function updateConnectionStatus(connected) {
+            const statusDiv = document.getElementById('connectionStatus');
+            statusDiv.className = `connection-status ${connected ? 'connected' : 'disconnected'}`;
+            statusDiv.textContent = connected ? '🟢 Connected' : '🔴 Disconnected';
+        }
+        
+        function connectWebSocket() {
+            const url = document.getElementById('wsUrl').value;
+            
+            if (socket && socket.connected) {
+                log('Already connected', 'error');
+                return;
+            }
+            
+            log(`Connecting to ${url}...`);
+            
+            socket = io(url, {
+                transports: ['websocket'],
+                reconnection: true
+            });
+            
+            socket.on('connect', () => {
+                log('WebSocket connected!', 'update');
+                updateConnectionStatus(true);
+                showStatus('wsStatus', 'Connected to Monitor Service', 'success');
+            });
+            
+            socket.on('disconnect', () => {
+                log('WebSocket disconnected', 'error');
+                updateConnectionStatus(false);
+                showStatus('wsStatus', 'Disconnected', 'error');
+            });
+            
+            socket.on('connection_response', (data) => {
+                log(`Connection response: ${JSON.stringify(data)}`, 'update');
+            });
+            
+            socket.on('simulation_update', (data) => {
+                updateCounter++;
+                document.getElementById('updateCount').textContent = updateCounter;
+                
+                log(`Update received for ${data.simulation_id}: ${data.update_type}`, 'update');
+                
+                if (data.delta && data.delta.data) {
+                    if (data.delta.data.channel_matrix_summary) {
+                        const avgSnr = data.delta.data.channel_matrix_summary.avg_snr;
+                        document.getElementById('avgSNR').textContent = avgSnr.toFixed(2);
+                    }
+                }
+            });
+            
+            socket.on('error', (error) => {
+                log(`Error: ${error}`, 'error');
+            });
+        }
+        
+        function disconnectWebSocket() {
+            if (socket) {
+                socket.disconnect();
+                socket = null;
+                log('Disconnected from WebSocket');
+                updateConnectionStatus(false);
+            }
+        }
+        
+        function showStatus(elementId, message, type) {
+            const div = document.getElementById(elementId);
+            div.className = `status ${type}`;
+            div.textContent = message;
+            setTimeout(() => {
+                div.textContent = '';
+                div.className = '';
+            }, 5000);
+        }
+        
+        async function createScenario() {
+            const name = document.getElementById('scenarioName').value;
+            const numUsers = parseInt(document.getElementById('numUsers').value);
+            const duration = parseInt(document.getElementById('duration').value);
+            
+            try {
+                log(`Creating scenario: ${name}...`);
+                
+                const response = await fetch(`${API_BASE}/scenario/create`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        name: name,
+                        num_users: numUsers,
+                        duration: duration,
+                        type: 'urban_mobility'
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    log(`Scenario created: ${data.scenario_id}`, 'update');
+                    document.getElementById('scenarioId').value = data.scenario_id;
+                    showStatus('scenarioStatus', `Scenario created: ${data.scenario_id}`, 'success');
+                } else {
+                    log(`Error: ${data.error}`, 'error');
+                    showStatus('scenarioStatus', `Error: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                log(`Error: ${error.message}`, 'error');
+                showStatus('scenarioStatus', `Error: ${error.message}`, 'error');
+            }
+        }
+        
+        async function startSimulation() {
+            const scenarioId = document.getElementById('scenarioId').value;
+            
+            if (!scenarioId) {
+                showStatus('simulationStatus', 'Please enter a scenario ID', 'error');
+                return;
+            }
+            
+            try {
+                log(`Starting simulation with scenario ${scenarioId}...`);
+                
+                const response = await fetch(`${API_BASE}/simulation/start`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ scenario_id: scenarioId })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    log(`Simulation started: ${data.simulation_id}`, 'update');
+                    showStatus('simulationStatus', `Simulation started: ${data.simulation_id}`, 'success');
+                    
+                    // Subscribe to simulation updates
+                    if (socket && socket.connected) {
+                        socket.emit('subscribe', { simulation_id: data.simulation_id });
+                        log(`Subscribed to simulation ${data.simulation_id}`);
+                    }
+                    
+                    document.getElementById('activeSimulations').textContent = '1';
+                } else {
+                    log(`Error: ${data.error}`, 'error');
+                    showStatus('simulationStatus', `Error: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                log(`Error: ${error.message}`, 'error');
+                showStatus('simulationStatus', `Error: ${error.message}`, 'error');
+            }
+        }
+        
+        // 페이지 로드 시 기본 WebSocket URL 설정
+        window.addEventListener('load', () => {
+            const wsUrlInput = document.getElementById('wsUrl');
+            if (!wsUrlInput.value) {
+                wsUrlInput.value = defaultWsUrl;
+            }
+            log(`API Base: ${API_BASE}`);
+            log(`Default WebSocket URL: ${defaultWsUrl}`);
+        });
+    </script>
+</body>
+</html>

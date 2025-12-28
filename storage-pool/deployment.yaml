@@ -1,0 +1,78 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: storage-service
+  namespace: storage-pool
+  labels:
+    project: wireless-simulation-pipeline
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: storage-service
+  template:
+    metadata:
+      labels:
+        app: storage-service
+        project: wireless-simulation-pipeline
+    spec:
+      containers:
+      - name: storage
+        image: storage-pool:latest
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 8080
+        env:
+        - name: PORT
+          value: "8080"
+        - name: RESULTS_DIR
+          value: "/app/results"
+        - name: SCENARIOS_DIR
+          value: "/app/scenarios"
+        volumeMounts:
+        - name: results-storage
+          mountPath: /app/results
+        - name: scenarios-storage
+          mountPath: /app/scenarios
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 10
+      volumes:
+      - name: results-storage
+        emptyDir: {}
+      - name: scenarios-storage
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: storage-service
+  namespace: storage-pool
+  labels:
+    project: wireless-simulation-pipeline
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8080
+    targetPort: 8080
+    protocol: TCP
+    name: http
+  selector:
+    app: storage-service

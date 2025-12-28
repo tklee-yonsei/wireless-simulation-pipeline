@@ -1,0 +1,54 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: control-pool
+  labels:
+    name: control-pool
+    pool-type: control
+    project: wireless-simulation-pipeline
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: scenario-pool
+  labels:
+    name: scenario-pool
+    pool-type: scenario
+    project: wireless-simulation-pipeline
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: calc-pool
+  labels:
+    name: calc-pool
+    pool-type: calculation
+    project: wireless-simulation-pipeline
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitor-pool
+  labels:
+    name: monitor-pool
+    pool-type: monitoring
+    project: wireless-simulation-pipeline
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: storage-pool
+  labels:
+    name: storage-pool
+    pool-type: storage
+    project: wireless-simulation-pipeline
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: queue-system
+  labels:
+    name: queue-system
+    pool-type: infrastructure
+    project: wireless-simulation-pipeline
