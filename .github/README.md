@@ -25,10 +25,12 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Deploy to remote server
-        run: ./scripts/deploy-to-remote.sh -h ${{ secrets.REMOTE_HOST }}
+        run: ./scripts/deploy-to-remote.sh -h ${{ secrets.REMOTE_HOST }} --no-cache control-pool
         env:
           REMOTE_HOST: ${{ secrets.REMOTE_HOST }}
           REMOTE_USER: ${{ secrets.REMOTE_USER }}
+          # 선택사항: 특정 풀만 캐시 없이 재빌드
+          # --no-cache control-pool calc-pool
 ```
 
 ### 필요한 GitHub Secrets
@@ -42,7 +44,11 @@ jobs:
 수동 배포를 사용하세요:
 
 ```bash
+# 기본 배포
 ./scripts/deploy-to-remote.sh -h <server-ip>
+
+# 특정 풀만 캐시 없이 재빌드
+./scripts/deploy-to-remote.sh -h <server-ip> --no-cache control-pool calc-pool
 ```
 
 자세한 내용은 [REMOTE-DEPLOYMENT.md](../REMOTE-DEPLOYMENT.md)를 참고하세요.

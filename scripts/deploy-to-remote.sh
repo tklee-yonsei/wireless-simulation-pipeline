@@ -35,6 +35,7 @@ usage() {
     echo "  -p, --path PATH       Remote path (default: /home/USER/wireless-simulation-pipeline)"
     echo "  --sync-only          Only sync code, don't deploy"
     echo "  --deploy-only        Only deploy, don't sync"
+    echo "  --no-cache POOL...   Build specified pools without cache (e.g., --no-cache control-pool calc-pool)"
     echo "  --help               Show this help message"
     echo ""
     echo "Environment variables:"
@@ -47,6 +48,7 @@ usage() {
     echo "  $0 -h 192.168.1.100"
     echo "  $0 -u myuser -h my-server.com -P 2222"
     echo "  $0 -u ubuntu -h my-server.com -P 2222 -p /opt/wireless-sim"
+    echo "  $0 -h my-server.com --no-cache control-pool calc-pool"
     echo "  REMOTE_HOST=my-server.com REMOTE_USER=myuser REMOTE_PORT=2222 $0"
     exit 1
 }
@@ -54,6 +56,7 @@ usage() {
 # 인자 파싱
 SYNC=true
 DEPLOY=true
+NO_CACHE_POOLS=""
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -81,6 +84,18 @@ while [[ $# -gt 0 ]]; do
         --deploy-only)
             SYNC=false
             shift
+            ;;
+        --no-cache)
+            # --no-cache 다음에 오는 모든 풀 이름을 수집
+            shift
+            while [[ $# -gt 0 ]] && [[ ! "$1" =~ ^- ]]; do
+                if [ -z "$NO_CACHE_POOLS" ]; then
+                    NO_CACHE_POOLS="$1"
+                else
+                    NO_CACHE_POOLS="$NO_CACHE_POOLS $1"
+                fi
+                shift
+            done
             ;;
         --help)
             usage
@@ -219,15 +234,27 @@ echo "🔨 Building Docker images..."
 echo "ℹ️  Note: If sudo password is required, you may need to configure sudo NOPASSWD"
 echo "   Run this on the server: sudo visudo"
 echo "   Add: ${REMOTE_USER} ALL=(ALL) NOPASSWD: /usr/local/bin/k3s"
+if [ -n "$NO_CACHE_POOLS" ]; then
+    echo "ℹ️  Building without cache for: $NO_CACHE_POOLS"
+fi
 echo ""
 chmod +x scripts/build-images.sh
-./scripts/build-images.sh
+if [ -n "$NO_CACHE_POOLS" ]; then
+    NO_CACHE_POOLS="$NO_CACHE_POOLS" ./scripts/build-images.sh
+else
+    ./scripts/build-images.sh
+fi
 echo ""
 
 # 배포
 echo "📦 Deploying to K3s..."
 chmod +x scripts/deploy-all.sh
-./scripts/deploy-all.sh
+# NO_CACHE_POOLS 환경변수를 전달하여 해당 풀들의 Deployment 재시작
+if [ -n "$NO_CACHE_POOLS" ]; then
+    NO_CACHE_POOLS="$NO_CACHE_POOLS" ./scripts/deploy-all.sh
+else
+    ./scripts/deploy-all.sh
+fi
 echo ""
 
 echo "====================================="
