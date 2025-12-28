@@ -3,6 +3,9 @@
   "build": {
     "dockerfile": "Dockerfile"
   },
+  "mounts": [
+    "source=${localEnv:HOME}/.ssh,target=/home/vscode/.ssh,type=bind,consistency=cached"
+  ],
   "customizations": {
     "vscode": {
       "extensions": [
@@ -10,7 +13,9 @@
         "ms-python.pylint",
         "ms-python.black-formatter",
         "charliermarsh.ruff",
-        "redhat.vscode-yaml"
+        "redhat.vscode-yaml",
+        "DavidAnson.vscode-markdownlint",
+        "yzhang.markdown-all-in-one"
       ],
       "settings": {
         "python.defaultInterpreterPath": "/usr/local/bin/python",
@@ -31,5 +36,6 @@
     }
   },
   "postCreateCommand": "pip install -e . 2>/dev/null || pip install -r requirements.txt 2>/dev/null || true",
-  "remoteUser": "vscode"
+  "remoteUser": "vscode",
+  "postStartCommand": "chmod 700 /home/vscode/.ssh && chmod 600 /home/vscode/.ssh/* 2>/dev/null || true"
 }

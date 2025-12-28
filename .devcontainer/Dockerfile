@@ -6,6 +6,8 @@ RUN apt-get update && apt-get install -y \
     curl \
     git \
     vim \
+    rsync \
+    openssh-client \
     && rm -rf /var/lib/apt/lists/*
 
 # 비-root 사용자 생성
