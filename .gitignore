@@ -159,3 +159,6 @@ simulation_outputs/
 results/
 output/
 
+# Custom user-specific files
+custom/
+

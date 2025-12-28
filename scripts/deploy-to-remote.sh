@@ -166,6 +166,7 @@ if [ "$SYNC" = true ]; then
             --exclude='.DS_Store' \
             --exclude='*.swp' \
             --exclude='.vscode' \
+            --exclude='custom' \
             . ${REMOTE_USER}@${REMOTE_HOST}:${REMOTE_PATH}/
     else
         echo "⚠️  rsync not found, using scp (slower)..."
