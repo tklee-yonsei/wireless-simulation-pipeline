@@ -67,6 +67,10 @@ metadata:
   namespace: storage-pool
   labels:
     project: wireless-simulation-pipeline
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8080"
+    prometheus.io/path: "/metrics"
 spec:
   type: ClusterIP
   ports:

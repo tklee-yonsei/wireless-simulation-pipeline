@@ -45,6 +45,9 @@ metadata:
   namespace: queue-system
   labels:
     project: wireless-simulation-pipeline
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "6379"
 spec:
   type: ClusterIP
   ports:
