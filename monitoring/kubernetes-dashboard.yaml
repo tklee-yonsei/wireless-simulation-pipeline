@@ -1,0 +1,361 @@
+---
+# Kubernetes Dashboard Namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kubernetes-dashboard
+  labels:
+    name: kubernetes-dashboard
+---
+# Dashboard ServiceAccount
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: kubernetes-dashboard
+  namespace: kubernetes-dashboard
+---
+# Dashboard Secret
+apiVersion: v1
+kind: Secret
+metadata:
+  name: kubernetes-dashboard-certs
+  namespace: kubernetes-dashboard
+type: Opaque
+---
+# Dashboard Secret Key Holder
+apiVersion: v1
+kind: Secret
+metadata:
+  name: kubernetes-dashboard-csrf
+  namespace: kubernetes-dashboard
+type: Opaque
+data:
+  csrf: ""
+---
+# Dashboard Secret Key Holder
+apiVersion: v1
+kind: Secret
+metadata:
+  name: kubernetes-dashboard-key-holder
+  namespace: kubernetes-dashboard
+type: Opaque
+---
+# Dashboard ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kubernetes-dashboard-settings
+  namespace: kubernetes-dashboard
+---
+# Dashboard ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kubernetes-dashboard
+  labels:
+    project: wireless-simulation-pipeline
+rules:
+  # 클러스터 전체 리소스 읽기 권한
+  - apiGroups: [""]
+    resources:
+      - configmaps
+      - endpoints
+      - persistentvolumeclaims
+      - pods
+      - replicationcontrollers
+      - replicationcontrollers/scale
+      - serviceaccounts
+      - services
+      - nodes
+      - persistentvolumes
+      - namespaces
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources:
+      - events
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apps"]
+    resources:
+      - daemonsets
+      - deployments
+      - deployments/scale
+      - replicasets
+      - replicasets/scale
+      - statefulsets
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["autoscaling"]
+    resources:
+      - horizontalpodautoscalers
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["batch"]
+    resources:
+      - cronjobs
+      - jobs
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["extensions", "networking.k8s.io"]
+    resources:
+      - ingresses
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["storage.k8s.io"]
+    resources:
+      - storageclasses
+      - volumeattachments
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources:
+      - clusterrolebindings
+      - clusterroles
+      - roles
+      - rolebindings
+    verbs: ["get", "list", "watch"]
+  # Metrics 서버 접근
+  - apiGroups: ["metrics.k8s.io"]
+    resources:
+      - pods
+      - nodes
+    verbs: ["get", "list", "watch"]
+---
+# Dashboard ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: kubernetes-dashboard
+  labels:
+    project: wireless-simulation-pipeline
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: kubernetes-dashboard
+subjects:
+  - kind: ServiceAccount
+    name: kubernetes-dashboard
+    namespace: kubernetes-dashboard
+---
+# Dashboard Role (namespace-specific)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: kubernetes-dashboard
+  namespace: kubernetes-dashboard
+rules:
+  # Dashboard Settings 접근
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames:
+      - kubernetes-dashboard-key-holder
+      - kubernetes-dashboard-certs
+      - kubernetes-dashboard-csrf
+    verbs: ["get", "update", "delete"]
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    resourceNames: ["kubernetes-dashboard-settings"]
+    verbs: ["get", "update"]
+  - apiGroups: [""]
+    resources: ["services"]
+    resourceNames: ["heapster", "dashboard-metrics-scraper"]
+    verbs: ["proxy"]
+  - apiGroups: [""]
+    resources: ["services/proxy"]
+    resourceNames:
+      - heapster
+      - "http:heapster:"
+      - "https:heapster:"
+      - dashboard-metrics-scraper
+      - "http:dashboard-metrics-scraper"
+    verbs: ["get"]
+---
+# Dashboard RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: kubernetes-dashboard
+  namespace: kubernetes-dashboard
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: kubernetes-dashboard
+subjects:
+  - kind: ServiceAccount
+    name: kubernetes-dashboard
+    namespace: kubernetes-dashboard
+---
+# Dashboard Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kubernetes-dashboard
+  namespace: kubernetes-dashboard
+  labels:
+    app: kubernetes-dashboard
+    project: wireless-simulation-pipeline
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kubernetes-dashboard
+  template:
+    metadata:
+      labels:
+        app: kubernetes-dashboard
+        project: wireless-simulation-pipeline
+    spec:
+      serviceAccountName: kubernetes-dashboard
+      containers:
+        - name: kubernetes-dashboard
+          image: kubernetesui/dashboard:v2.7.0
+          args:
+            - --namespace=kubernetes-dashboard
+            - --enable-skip-login
+            - --disable-settings-authorizer
+            - --enable-insecure-login
+          ports:
+            - containerPort: 9090
+              protocol: TCP
+          volumeMounts:
+            - name: tmp-volume
+              mountPath: /tmp
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "50m"
+            limits:
+              memory: "256Mi"
+              cpu: "200m"
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 9090
+            initialDelaySeconds: 30
+            timeoutSeconds: 30
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsUser: 1001
+            runAsGroup: 2001
+      volumes:
+        - name: tmp-volume
+          emptyDir: {}
+      tolerations:
+        - key: node-role.kubernetes.io/master
+          effect: NoSchedule
+---
+# Dashboard Metrics Scraper Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dashboard-metrics-scraper
+  namespace: kubernetes-dashboard
+  labels:
+    app: dashboard-metrics-scraper
+    project: wireless-simulation-pipeline
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dashboard-metrics-scraper
+  template:
+    metadata:
+      labels:
+        app: dashboard-metrics-scraper
+        project: wireless-simulation-pipeline
+    spec:
+      serviceAccountName: kubernetes-dashboard
+      containers:
+        - name: dashboard-metrics-scraper
+          image: kubernetesui/metrics-scraper:v1.0.8
+          ports:
+            - containerPort: 8000
+              protocol: TCP
+          volumeMounts:
+            - name: tmp-volume
+              mountPath: /tmp
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "40m"
+            limits:
+              memory: "128Mi"
+              cpu: "100m"
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8000
+            initialDelaySeconds: 30
+            timeoutSeconds: 30
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsUser: 1001
+            runAsGroup: 2001
+      volumes:
+        - name: tmp-volume
+          emptyDir: {}
+      tolerations:
+        - key: node-role.kubernetes.io/master
+          effect: NoSchedule
+---
+# Dashboard Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: kubernetes-dashboard
+  namespace: kubernetes-dashboard
+  labels:
+    app: kubernetes-dashboard
+    project: wireless-simulation-pipeline
+spec:
+  type: NodePort
+  ports:
+    - port: 9090
+      targetPort: 9090
+      nodePort: 30092
+      name: http
+  selector:
+    app: kubernetes-dashboard
+---
+# Metrics Scraper Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: dashboard-metrics-scraper
+  namespace: kubernetes-dashboard
+  labels:
+    app: dashboard-metrics-scraper
+    project: wireless-simulation-pipeline
+spec:
+  ports:
+    - port: 8000
+      targetPort: 8000
+  selector:
+    app: dashboard-metrics-scraper
+---
+# Admin User for Dashboard (token-based access)
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: admin-user
+  namespace: kubernetes-dashboard
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: admin-user
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+  - kind: ServiceAccount
+    name: admin-user
+    namespace: kubernetes-dashboard
+---
+# Secret for Admin User Token
+apiVersion: v1
+kind: Secret
+metadata:
+  name: admin-user-token
+  namespace: kubernetes-dashboard
+  annotations:
+    kubernetes.io/service-account.name: admin-user
+type: kubernetes.io/service-account-token
+
