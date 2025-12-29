@@ -36,6 +36,8 @@ usage() {
     echo "  --sync-only          Only sync code, don't deploy"
     echo "  --deploy-only        Only deploy, don't sync"
     echo "  --no-cache POOL...   Build specified pools without cache (e.g., --no-cache control-pool calc-pool)"
+    echo "  --with-monitoring    Deploy monitoring stack (Prometheus, Grafana, K8s Dashboard) along with services"
+    echo "  --monitoring-only    Only deploy monitoring stack (skip main services)"
     echo "  --help               Show this help message"
     echo ""
     echo "Environment variables:"
@@ -49,6 +51,8 @@ usage() {
     echo "  $0 -u myuser -h my-server.com -P 2222"
     echo "  $0 -u ubuntu -h my-server.com -P 2222 -p /opt/wireless-sim"
     echo "  $0 -h my-server.com --no-cache control-pool calc-pool"
+    echo "  $0 -h my-server.com --with-monitoring"
+    echo "  $0 -h my-server.com --monitoring-only"
     echo "  REMOTE_HOST=my-server.com REMOTE_USER=myuser REMOTE_PORT=2222 $0"
     exit 1
 }
@@ -57,6 +61,8 @@ usage() {
 SYNC=true
 DEPLOY=true
 NO_CACHE_POOLS=""
+WITH_MONITORING=false
+MONITORING_ONLY=false
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -97,6 +103,15 @@ while [[ $# -gt 0 ]]; do
                 shift
             done
             ;;
+        --with-monitoring)
+            WITH_MONITORING=true
+            shift
+            ;;
+        --monitoring-only)
+            MONITORING_ONLY=true
+            WITH_MONITORING=true
+            shift
+            ;;
         --help)
             usage
             ;;
@@ -129,6 +144,13 @@ echo "SSH Port: ${REMOTE_PORT}"
 echo "Remote Path: ${REMOTE_PATH}"
 if [ "$REMOTE_PATH_SPECIFIED" = false ]; then
     echo "         (auto-generated from user)"
+fi
+if [ "$MONITORING_ONLY" = true ]; then
+    echo "Mode: Monitoring Only"
+elif [ "$WITH_MONITORING" = true ]; then
+    echo "Mode: Full Deploy + Monitoring"
+else
+    echo "Mode: Full Deploy (no monitoring)"
 fi
 echo "====================================="
 echo ""
@@ -229,47 +251,76 @@ else
     echo ""
 fi
 
-# 이미지 빌드
-echo "🔨 Building Docker images..."
-echo "ℹ️  Note: If sudo password is required, you may need to configure sudo NOPASSWD"
-echo "   Run this on the server: sudo visudo"
-echo "   Add: ${REMOTE_USER} ALL=(ALL) NOPASSWD: /usr/local/bin/k3s"
-if [ -n "$NO_CACHE_POOLS" ]; then
-    echo "ℹ️  Building without cache for: $NO_CACHE_POOLS"
-fi
-echo ""
-chmod +x scripts/build-images.sh
-if [ -n "$NO_CACHE_POOLS" ]; then
-    NO_CACHE_POOLS="$NO_CACHE_POOLS" ./scripts/build-images.sh
-else
-    ./scripts/build-images.sh
-fi
-echo ""
+# MONITORING_ONLY가 아닌 경우에만 메인 서비스 빌드/배포
+if [ "${MONITORING_ONLY}" != "true" ]; then
+    # 이미지 빌드
+    echo "🔨 Building Docker images..."
+    echo "ℹ️  Note: If sudo password is required, you may need to configure sudo NOPASSWD"
+    echo "   Run this on the server: sudo visudo"
+    echo "   Add: ${REMOTE_USER} ALL=(ALL) NOPASSWD: /usr/local/bin/k3s"
+    if [ -n "${NO_CACHE_POOLS}" ]; then
+        echo "ℹ️  Building without cache for: ${NO_CACHE_POOLS}"
+    fi
+    echo ""
+    chmod +x scripts/build-images.sh
+    if [ -n "${NO_CACHE_POOLS}" ]; then
+        NO_CACHE_POOLS="${NO_CACHE_POOLS}" ./scripts/build-images.sh
+    else
+        ./scripts/build-images.sh
+    fi
+    echo ""
 
-# 배포
-echo "📦 Deploying to K3s..."
-chmod +x scripts/deploy-all.sh
-# NO_CACHE_POOLS 환경변수를 전달하여 해당 풀들의 Deployment 재시작
-if [ -n "$NO_CACHE_POOLS" ]; then
-    NO_CACHE_POOLS="$NO_CACHE_POOLS" ./scripts/deploy-all.sh
-else
-    ./scripts/deploy-all.sh
+    # 배포
+    echo "📦 Deploying to K3s..."
+    chmod +x scripts/deploy-all.sh
+    # NO_CACHE_POOLS 환경변수를 전달하여 해당 풀들의 Deployment 재시작
+    if [ -n "${NO_CACHE_POOLS}" ]; then
+        NO_CACHE_POOLS="${NO_CACHE_POOLS}" ./scripts/deploy-all.sh
+    else
+        ./scripts/deploy-all.sh
+    fi
+    echo ""
+
+    echo "====================================="
+    echo "✅ Main Services Deployment Complete!"
+    echo "====================================="
+    echo ""
+
+    # 상태 확인
+    echo "📊 Current deployment status:"
+    kubectl get pods -A | grep -E "(NAMESPACE|queue-system|storage-pool|scenario-pool|calc-pool|monitor-pool|control-pool)"
+    echo ""
+
+    # 서비스 포트 확인
+    echo "🌐 Service ports:"
+    kubectl get svc -A | grep -E "(NAMESPACE|api-gateway|monitor-service)"
+    echo ""
 fi
-echo ""
+
+# 모니터링 배포
+if [ "${WITH_MONITORING}" = "true" ]; then
+    echo "====================================="
+    echo "📊 Deploying Monitoring Stack..."
+    echo "====================================="
+    echo ""
+    chmod +x scripts/deploy-monitoring.sh
+    ./scripts/deploy-monitoring.sh
+    echo ""
+    
+    echo "📊 Monitoring deployment status:"
+    kubectl get pods -n monitoring
+    kubectl get pods -n kubernetes-dashboard
+    echo ""
+    
+    echo "🌐 Monitoring service ports:"
+    kubectl get svc -n monitoring
+    kubectl get svc -n kubernetes-dashboard | grep kubernetes-dashboard
+    echo ""
+fi
 
 echo "====================================="
-echo "✅ Deployment Complete!"
+echo "✅ All Deployments Complete!"
 echo "====================================="
-echo ""
-
-# 상태 확인
-echo "📊 Current deployment status:"
-kubectl get pods -A | grep -E "(NAMESPACE|queue-system|storage-pool|scenario-pool|calc-pool|monitor-pool|control-pool)"
-echo ""
-
-# 서비스 포트 확인
-echo "🌐 Service ports:"
-kubectl get svc -A | grep -E "(NAMESPACE|api-gateway|monitor-service)"
 echo ""
 
 ENDSSH
@@ -283,25 +334,48 @@ ENDSSH
         echo "🌐 Access your application:"
         echo ""
         echo "Option 1: SSH Tunnel (Recommended)"
-        echo "  - 서버 방화벽에서 30080, 30081, 30082 포트를 개방할 필요 없음"
+        echo "  - 서버 방화벽에서 포트를 개방할 필요 없음"
         echo "  - SSH 포트만 열려있으면 됨 (보안상 권장)"
         echo "  - Run this command in a new terminal:"
-        if [ "${REMOTE_PORT}" != "22" ]; then
-            echo "  ssh -p ${REMOTE_PORT} -L 30080:localhost:30080 -L 30081:localhost:30081 -L 30082:localhost:30082 ${REMOTE_USER}@${REMOTE_HOST}"
+        if [ "$WITH_MONITORING" = true ]; then
+            # 모니터링 포트 포함
+            if [ "${REMOTE_PORT}" != "22" ]; then
+                echo "  ssh -p ${REMOTE_PORT} -L 30080:localhost:30080 -L 30081:localhost:30081 -L 30082:localhost:30082 -L 30090:localhost:30090 -L 30091:localhost:30091 -L 30092:localhost:30092 ${REMOTE_USER}@${REMOTE_HOST}"
+            else
+                echo "  ssh -L 30080:localhost:30080 -L 30081:localhost:30081 -L 30082:localhost:30082 -L 30090:localhost:30090 -L 30091:localhost:30091 -L 30092:localhost:30092 ${REMOTE_USER}@${REMOTE_HOST}"
+            fi
         else
-            echo "  ssh -L 30080:localhost:30080 -L 30081:localhost:30081 -L 30082:localhost:30082 ${REMOTE_USER}@${REMOTE_HOST}"
+            if [ "${REMOTE_PORT}" != "22" ]; then
+                echo "  ssh -p ${REMOTE_PORT} -L 30080:localhost:30080 -L 30081:localhost:30081 -L 30082:localhost:30082 ${REMOTE_USER}@${REMOTE_HOST}"
+            else
+                echo "  ssh -L 30080:localhost:30080 -L 30081:localhost:30081 -L 30082:localhost:30082 ${REMOTE_USER}@${REMOTE_HOST}"
+            fi
         fi
         echo ""
         echo "  Then access (터널이 유지되는 동안):"
-        echo "  - API Gateway:     http://localhost:30080"
-        echo "  - Monitor Service: http://localhost:30081"
-        echo "  - WebSocket:       ws://localhost:30082"
+        if [ "$MONITORING_ONLY" != true ]; then
+            echo "  - API Gateway:     http://localhost:30080"
+            echo "  - Monitor Service: http://localhost:30081"
+            echo "  - WebSocket:       ws://localhost:30082"
+        fi
+        if [ "$WITH_MONITORING" = true ]; then
+            echo "  - Prometheus:      http://localhost:30090"
+            echo "  - Grafana:         http://localhost:30091  (admin/admin123)"
+            echo "  - K8s Dashboard:   http://localhost:30092"
+        fi
         echo ""
         echo "Option 2: Direct Access (서버 방화벽에서 포트 개방 필요)"
-        echo "  - 서버 방화벽에서 30080, 30081, 30082 포트를 외부에 개방해야 함"
-        echo "  - API Gateway:     http://${REMOTE_HOST}:30080"
-        echo "  - Monitor Service: http://${REMOTE_HOST}:30081"
-        echo "  - WebSocket:       ws://${REMOTE_HOST}:30082"
+        echo "  - 서버 방화벽에서 해당 포트를 외부에 개방해야 함"
+        if [ "$MONITORING_ONLY" != true ]; then
+            echo "  - API Gateway:     http://${REMOTE_HOST}:30080"
+            echo "  - Monitor Service: http://${REMOTE_HOST}:30081"
+            echo "  - WebSocket:       ws://${REMOTE_HOST}:30082"
+        fi
+        if [ "$WITH_MONITORING" = true ]; then
+            echo "  - Prometheus:      http://${REMOTE_HOST}:30090"
+            echo "  - Grafana:         http://${REMOTE_HOST}:30091  (admin/admin123)"
+            echo "  - K8s Dashboard:   http://${REMOTE_HOST}:30092"
+        fi
         echo ""
         echo "💡 View logs:"
         if [ "${REMOTE_PORT}" != "22" ]; then
@@ -317,6 +391,15 @@ ENDSSH
             echo "  ssh ${REMOTE_USER}@${REMOTE_HOST} 'kubectl get pods -A'"
         fi
         echo ""
+        if [ "$WITH_MONITORING" = true ]; then
+            echo "🔑 Get Kubernetes Dashboard token:"
+            if [ "${REMOTE_PORT}" != "22" ]; then
+                echo "  ssh -p ${REMOTE_PORT} ${REMOTE_USER}@${REMOTE_HOST} \"kubectl get secret admin-user-token -n kubernetes-dashboard -o jsonpath='{.data.token}' | base64 -d && echo\""
+            else
+                echo "  ssh ${REMOTE_USER}@${REMOTE_HOST} \"kubectl get secret admin-user-token -n kubernetes-dashboard -o jsonpath='{.data.token}' | base64 -d && echo\""
+            fi
+            echo ""
+        fi
     else
         echo ""
         echo "❌ Deployment failed on remote server"

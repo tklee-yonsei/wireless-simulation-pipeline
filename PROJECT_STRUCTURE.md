@@ -47,10 +47,18 @@ wireless-simulation-pipeline/
 │   ├── web-client.html                 # 웹 기반 모니터링 UI
 │   └── blender-viewer.py               # Blender 3D 뷰어 샘플
 │
+├── monitoring/                         # 통합 모니터링 시스템
+│   ├── namespace.yaml                  # monitoring 네임스페이스
+│   ├── prometheus.yaml                 # Prometheus 설정 및 배포
+│   ├── grafana.yaml                    # Grafana 설정 및 대시보드
+│   └── kubernetes-dashboard.yaml       # Kubernetes Dashboard
+│
 └── scripts/                            # 자동화 스크립트
     ├── install-k3s.sh                  # K3s 설치
     ├── build-images.sh                 # Docker 이미지 빌드
     ├── deploy-all.sh                   # 전체 시스템 배포
+    ├── deploy-monitoring.sh            # 모니터링 스택 배포
+    ├── cleanup-monitoring.sh           # 모니터링 스택 정리
     ├── test-pipeline.sh                # 파이프라인 테스트
     ├── cleanup.sh                      # 리소스 정리
     └── uninstall-k3s.sh                # K3s 제거
@@ -118,11 +126,14 @@ Monitor Service → Client (WebSocket)
 
 ### 포트 맵핑
 
-| 서비스            | 내부 포트 | NodePort | 용도      |
-| ----------------- | --------- | -------- | --------- |
-| API Gateway       | 8080      | 30080    | REST API  |
-| Monitor HTTP      | 8080      | 30081    | HTTP API  |
-| Monitor WebSocket | 8081      | 30082    | WebSocket |
+| 서비스               | 내부 포트 | NodePort | 용도          |
+| -------------------- | --------- | -------- | ------------- |
+| API Gateway          | 8080      | 30080    | REST API      |
+| Monitor HTTP         | 8080      | 30081    | HTTP API      |
+| Monitor WebSocket    | 8081      | 30082    | WebSocket     |
+| Prometheus           | 9090      | 30090    | 메트릭 수집   |
+| Grafana              | 3000      | 30091    | 대시보드      |
+| Kubernetes Dashboard | 9090      | 30092    | 클러스터 관리 |
 
 ### 환경 변수
 
@@ -166,8 +177,52 @@ Monitor Service → Client (WebSocket)
 - **Redis**: Cluster 모드로 확장
 - **GPU**: calc-pool에 GPU 할당
 
-## 모니터링
+## 모니터링 (Monitoring Stack)
 
-- Prometheus + Grafana 추가 가능
+프로젝트에는 통합 모니터링 시스템이 포함되어 있습니다.
+
+### 구성 요소
+
+1. **Prometheus** (포트 30090)
+   - 메트릭 수집 및 저장
+   - Kubernetes 서비스 자동 검색
+   - 15일 데이터 보존
+
+2. **Grafana** (포트 30091)
+   - 시각화 대시보드
+   - 사전 구성된 대시보드:
+     - Wireless Simulation Pipeline
+     - Kubernetes Cluster
+   - 기본 로그인: admin / admin123
+
+3. **Kubernetes Dashboard** (포트 30092)
+   - 클러스터 리소스 관리
+   - Pod/Deployment 상태 모니터링
+   - 실시간 로그 확인
+
+### 포트 맵핑 (모니터링)
+
+| 서비스               | 내부 포트 | NodePort | 용도          |
+| -------------------- | --------- | -------- | ------------- |
+| Prometheus           | 9090      | 30090    | 메트릭 수집   |
+| Grafana              | 3000      | 30091    | 대시보드      |
+| Kubernetes Dashboard | 9090      | 30092    | 클러스터 관리 |
+
+### 배포 명령어
+
+```bash
+# 모니터링 스택 배포
+./scripts/deploy-monitoring.sh
+
+# 모니터링 스택 정리
+./scripts/cleanup-monitoring.sh
+
+# Dashboard 토큰 확인
+kubectl get secret admin-user-token -n kubernetes-dashboard -o jsonpath='{.data.token}' | base64 -d && echo
+```
+
+### 추가 확장 가능
+
 - Loki + Promtail로 로그 수집 가능
-- Kubernetes Dashboard 사용 가능
+- AlertManager로 알림 설정 가능
+- Jaeger/Zipkin으로 분산 트레이싱 가능
