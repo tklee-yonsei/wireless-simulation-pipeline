@@ -102,8 +102,8 @@ data:
           "id": 3,
           "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
           "pluginVersion": "10.0.0",
-          "targets": [{"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "count(up{job=\"wireless-simulation-services\"} == 1) or vector(0)", "refId": "A"}],
-          "title": "Services Up",
+          "targets": [{"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "count(kube_pod_status_phase{namespace=~\"control-pool|scenario-pool|calc-pool|monitor-pool|storage-pool|queue-system\", phase=\"Running\"}) or vector(0)", "refId": "A"}],
+          "title": "Running Pods",
           "type": "stat"
         },
         {
@@ -253,7 +253,7 @@ data:
           "fieldConfig": {
             "defaults": {
               "color": {"mode": "thresholds"},
-              "mappings": [{"options": {"0": {"color": "red", "index": 1, "text": "Down"}, "1": {"color": "green", "index": 0, "text": "Up"}}, "type": "value"}],
+              "mappings": [{"options": {"0": {"color": "red", "index": 1, "text": "Down"}, "1": {"color": "green", "index": 0, "text": "Running"}}, "type": "value"}],
               "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 1}]},
               "unit": "short"
             },
@@ -263,8 +263,8 @@ data:
           "id": 13,
           "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "auto", "orientation": "horizontal", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
           "pluginVersion": "10.0.0",
-          "targets": [{"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "up{job=\"wireless-simulation-services\"}", "legendFormat": "{{service}} ({{namespace}})", "refId": "A"}],
-          "title": "Service Status",
+          "targets": [{"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "kube_pod_status_phase{namespace=~\"control-pool|scenario-pool|calc-pool|monitor-pool|storage-pool|queue-system\", phase=\"Running\"}", "legendFormat": "{{pod}} ({{namespace}})", "refId": "A"}],
+          "title": "Pod Status",
           "type": "stat"
         }
       ],
