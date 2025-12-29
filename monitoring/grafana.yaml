@@ -17,6 +17,7 @@ data:
         url: http://prometheus:9090
         isDefault: true
         editable: true
+        uid: prometheus
 ---
 # Grafana ConfigMap - Dashboard Providers
 apiVersion: v1

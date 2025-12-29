@@ -23,6 +23,16 @@ kubectl delete -f monitoring/prometheus.yaml --ignore-not-found=true
 echo "✅ Prometheus removed"
 
 echo ""
+echo "🗑️  Removing node-exporter..."
+kubectl delete -f monitoring/node-exporter.yaml --ignore-not-found=true
+echo "✅ node-exporter removed"
+
+echo ""
+echo "🗑️  Removing kube-state-metrics..."
+kubectl delete -f monitoring/kube-state-metrics.yaml --ignore-not-found=true
+echo "✅ kube-state-metrics removed"
+
+echo ""
 echo "🗑️  Removing monitoring namespace..."
 kubectl delete -f monitoring/namespace.yaml --ignore-not-found=true
 echo "✅ Monitoring namespace removed"

@@ -16,21 +16,35 @@ echo "✅ Monitoring namespace created"
 sleep 2
 
 echo ""
-echo "📦 Step 2: Deploying Prometheus..."
+echo "📦 Step 2: Deploying kube-state-metrics..."
+kubectl apply -f monitoring/kube-state-metrics.yaml
+echo "✅ kube-state-metrics deployed"
+
+sleep 2
+
+echo ""
+echo "📦 Step 3: Deploying node-exporter..."
+kubectl apply -f monitoring/node-exporter.yaml
+echo "✅ node-exporter deployed"
+
+sleep 2
+
+echo ""
+echo "📦 Step 4: Deploying Prometheus..."
 kubectl apply -f monitoring/prometheus.yaml
 echo "✅ Prometheus deployed"
 
 sleep 3
 
 echo ""
-echo "📦 Step 3: Deploying Grafana..."
+echo "📦 Step 5: Deploying Grafana..."
 kubectl apply -f monitoring/grafana.yaml
 echo "✅ Grafana deployed"
 
 sleep 3
 
 echo ""
-echo "📦 Step 4: Deploying Kubernetes Dashboard..."
+echo "📦 Step 6: Deploying Kubernetes Dashboard..."
 kubectl apply -f monitoring/kubernetes-dashboard.yaml
 echo "✅ Kubernetes Dashboard deployed"
 
